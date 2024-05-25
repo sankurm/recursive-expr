@@ -1,11 +1,14 @@
-#include <iostream>
 #include <algorithm>
+#include <array>
 #include <chrono>
-#include <span>
-#include <cstdint>
-#include <variant>
 #include <concepts>
+#include <cstdint>
 #include <functional>
+#include <iostream>
+#include <span>
+#include <sstream>
+#include <variant>
+#include <vector>
 
 template<typename F>
 concept a_field = requires(F f) {
@@ -132,12 +135,15 @@ using ip = uint32_t;
 
 struct ip_hdr
 {
+    uint8_t ihl;
+    uint8_t flags;
+    uint16_t len;
     ip src_ip;
     ip dst_ip;
 };
 
 template<>
-auto get_impl<std::span<uint8_t>, ip, 0>(const std::span<uint8_t>& ip_header) {
+auto get_impl<std::span<const uint8_t>, ip, 0>(const std::span<const uint8_t>& ip_header) {
     ip ret;
     std::copy_n(ip_header.data() + offsetof(ip_hdr, src_ip), sizeof(ip), &ret);
     return ret;
@@ -158,29 +164,68 @@ struct or_t
     U rhs;
 };
 
+std::string to_string(const std::chrono::system_clock::time_point& tp) {
+    std::ostringstream out;
+    out << std::chrono::floor<std::chrono::microseconds>(tp.time_since_epoch());
+    return std::move(out).str();
+}
+
+//auto print = []<typename T, int occ>(const field<T, occ>& f) { std::cout << f.val << '\n'; };
+auto print = []<a_field F>(const F& f) {
+    if constexpr (requires { std::cout << f.val; }) {
+        std::cout << f.val << '\n';
+    } else {
+        std::cout << to_string(f.val) << '\n';
+    }
+};
+auto hex_print = []<a_field F>(const F& f) {
+    if constexpr (requires { std::cout << f.val; }) {
+        std::cout << std::hex << f.val << '\n';
+    } else {
+        std::cout << std::hex << to_string(f.val) << '\n';
+    }
+};
 
 
 int main(int, char**) {
     Employee e1;
 
+    //Work with a field
     job_level_fld jlf{10};
-    //auto print = []<typename T, int occ>(const field<T, occ>& f) { std::cout << f.val << '\n'; };
-    auto print = []<a_field F>(const F& f) { std::cout << f.val << '\n'; };
+
+    //Print it
     jlf.apply(print);
 
+    //Match it
     auto equal = [&e1]<a_field F>(const F& fld) -> bool {
 		const auto actual_val = get<Employee, F>(e1);
 		return actual_val == fld.val;
-		//return get<typename F::value_type, F::n>(e1) == fld.val;
 	};
     jlf.apply(equal);
 
+    //Fields with multiple occurrences
+    auto doj = field<std::chrono::system_clock::time_point, 0>{};
+    auto doe = field<std::chrono::system_clock::time_point, 1>{};
+    doj.apply(print);
+    doe.apply(print);
 
-    
-    auto doj = get_impl<Employee, std::chrono::system_clock::time_point, 0>(e1);
-    auto doe = get_impl<Employee, std::chrono::system_clock::time_point, 1>(e1);
+    auto extract = [&e1]<a_field F>(const F& fld) -> typename F::value_type {
+        return get<Employee, F>(e1);
+    };
+    //std::cout << "Extracted DOJ: " << extract(doj) << '\n';
+    //std::cout << "Extracted DOE: " << extract(doe) << '\n';
 
-    //field<ip, any> host;
+    //Work with binary data
+    field<ip, 0> src_ip{0xa0b0c0d0};
+    field<ip, 1> dst_ip{0xa0b0c0d0};
+    constexpr std::array<uint8_t, 20> ipheader = {
+        0x04, 0x00, 0x08, 0x00, 0x67, 0x6f, 0x70, 0x61,  0x63, 0x6b, 0x65, 0x74, 0x02, 0x00, 0x05, 0x00,
+        0x61, 0x6d, 0x64, 0x36
+    };
+    const std::span<const uint8_t> iph{ipheader};
+
+    src_ip.apply(hex_print);
+    dst_ip.apply(hex_print);
     
     //auto doj = get_impl<joining_date, 0>(e1);
     //auto doe = get_impl<joining_date, 1>(e1);
