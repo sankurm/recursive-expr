@@ -105,6 +105,7 @@ const auto get(const Employee& emp) {
 }*/
 
 template<typename Data, a_field F>
+//requires field_applies_to_data<Data, F>
 auto get(const Data& d) {
     return get_impl<Data, typename F::value_type, F::n>(d);
 }
@@ -211,8 +212,8 @@ int main(int, char**) {
     jlf.apply(print);
 
     //Match it
-    auto equal = [&e1]<a_field F>(const F& fld) -> bool {
-		const auto actual_val = get<Employee, F>(e1);
+    auto equal = [&e1]<a_field Field>(const Field& fld) -> bool {
+		const auto actual_val = get<Employee, Field>(e1);
 		return actual_val == fld.val;
 	};
     jlf.apply(equal);
@@ -223,8 +224,8 @@ int main(int, char**) {
     doj.apply(print);
     doe.apply(print);
 
-    auto extract = [&e1]<a_field F>(const F& fld) -> typename F::value_type {
-        return get<Employee, F>(e1);
+    auto extract = [&e1]<a_field Field>(const Field& fld) -> typename Field::value_type {
+        return get<Employee, Field>(e1);
     };
     //std::cout << "Extracted DOJ: " << extract(doj) << '\n';
     //std::cout << "Extracted DOE: " << extract(doe) << '\n';
