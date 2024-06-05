@@ -16,9 +16,9 @@ concept a_field = requires(F f) {
     { F::n } -> std::convertible_to<int>;
 };
 
-template<typename F, typename D>
-concept field_applies_to_data = requires(D d, F f) {
-    true;
+template<typename Field, typename Data>
+concept field_applies_to_data = a_field<Field> && requires(Data d, Field f) {
+    get_impl<Data, typename Field::value_type, Field::n>(d);
 };
 
 //template<typename D, typename Fn>
@@ -42,27 +42,41 @@ std::ostream& operator<<(std::ostream& out, const field<T, occ>& jl) {
     return out << jl.val;
 }
 
-enum class initiative { csr, volunteer, referral };
+template<typename T>
+struct value
+{
+    T val;
+    auto operator<=>(const value<T>&) const = default;
+};
+template<typename T>
+std::ostream& operator<<(std::ostream& out, const value<T>& v) {
+    return out << v.val;
+}
 
-struct job_level
+using job_level = value<int>;
+/*struct job_level
 {
     int val;
     auto operator<=>(const job_level&) const = default;
 };
 std::ostream& operator<<(std::ostream& out, const job_level& jl) {
     return out << jl.val;
-}
+}*/
 
-struct joining_date
+using joining_date = value<std::chrono::system_clock::time_point>;
+/*struct joining_date
 {
     std::chrono::system_clock::time_point val;
-};
+    auto operator<=>(const joining_date&) const = default;
+};*/
 
 struct wfh_percent
 {
     int val;
     auto operator<=>(const wfh_percent&) const = default;
 };
+
+enum class initiative { csr, volunteer, referral };
 
 static_assert(a_field<field<job_level, 0>>, "field<job_level, 0> does not model the concept `a_field`");
 
@@ -76,7 +90,7 @@ struct Employee
 };
 
 template<typename Data, typename T, int occurrence>
-auto get_impl(const Data& emp); /*{
+auto get_impl(const Data& d); /*{
     static_assert(false, "Unsupported field occurrence");
 }*/
 
@@ -91,8 +105,8 @@ const auto get(const Employee& emp) {
 }*/
 
 template<typename Data, a_field F>
-auto get(const Data& emp) {
-    return get_impl<Data, typename F::value_type, F::n>(emp);
+auto get(const Data& d) {
+    return get_impl<Data, typename F::value_type, F::n>(d);
 }
 
 template<>
@@ -127,8 +141,8 @@ auto get_impl<Employee, std::chrono::system_clock::time_point, 1>(const Employee
 
 template<typename Data, typename T>
 requires (not a_field<T>)
-auto get(const Data& emp) {
-    return get_impl<Data, T, 0>(emp);
+auto get(const Data& d) {
+    return get_impl<Data, T, 0>(d);
 }
 
 using ip = uint32_t;
